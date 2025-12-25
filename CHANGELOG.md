@@ -2,12 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.2.0] - 2025-12-25
+## [0.3.0] - 2025-12-25
 
 ### Added
 
+- **Protobuf Format** - `HTTPSink` now supports `format` parameter: `"json"` (default) or `"protobuf"`
 - **HMAC Signing** - `HTTPSink` now supports optional HMAC-SHA256 request signing via the `hmac_key` parameter
-- **FieldNotesSink** - New convenience sink for Field Notes integration that reads HMAC key from `FIELDNOTES_HMAC_KEY` environment variable
+- **FieldNotesSink** - Convenience sink for Field Notes integration
+  - `FIELDNOTES_HMAC_KEY` env var for HMAC signing
+  - `FIELDNOTES_FORMAT` env var to choose between `json` (default) or `protobuf`
 
 ## [0.1.0] - 2025-12-25
 

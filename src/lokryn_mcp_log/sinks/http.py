@@ -4,7 +4,7 @@ import hashlib
 import hmac
 import json
 import os
-from typing import Mapping
+from typing import Literal, Mapping
 
 import httpx
 from google.protobuf.json_format import MessageToDict
@@ -15,7 +15,7 @@ from lokryn_mcp_log.schema import log_pb2
 class HTTPSink:
     """Emit logs to an HTTP endpoint.
 
-    Sends POST requests with JSON body.
+    Supports JSON or protobuf format, with optional HMAC-SHA256 signing.
     Raises on non-2xx responses.
     """
 
@@ -25,6 +25,7 @@ class HTTPSink:
         headers: Mapping[str, str] | None = None,
         timeout: float = 10.0,
         hmac_key: str | None = None,
+        format: Literal["json", "protobuf"] = "json",
     ):
         """Initialize HTTP sink.
 
@@ -33,12 +34,21 @@ class HTTPSink:
             headers: Optional headers (e.g., for authentication).
             timeout: Request timeout in seconds.
             hmac_key: Optional HMAC-SHA256 key for request signing.
+            format: Serialization format, "json" (default) or "protobuf".
         """
+        if format not in ("json", "protobuf"):
+            raise ValueError(f"Invalid format '{format}'. Must be 'json' or 'protobuf'.")
+
         self._endpoint = endpoint
         self._headers = dict(headers) if headers else {}
-        self._headers.setdefault("Content-Type", "application/json")
         self._timeout = timeout
         self._hmac_key = hmac_key
+        self._format = format
+
+        if format == "protobuf":
+            self._headers.setdefault("Content-Type", "application/x-protobuf")
+        else:
+            self._headers.setdefault("Content-Type", "application/json")
 
     def _sign(self, body: bytes) -> str:
         """Generate HMAC-SHA256 signature for request body."""
@@ -55,8 +65,11 @@ class HTTPSink:
             httpx.HTTPStatusError: On non-2xx response.
             httpx.RequestError: On connection/timeout errors.
         """
-        data = MessageToDict(record, preserving_proto_field_name=True)
-        body = json.dumps(data).encode()
+        if self._format == "protobuf":
+            body = record.SerializeToString()
+        else:
+            data = MessageToDict(record, preserving_proto_field_name=True)
+            body = json.dumps(data).encode()
 
         headers = self._headers.copy()
         if self._hmac_key:
@@ -74,26 +87,30 @@ class HTTPSink:
 class FieldNotesSink(HTTPSink):
     """Emit logs to Field Notes.
 
-    Reads HMAC key from FIELDNOTES_HMAC_KEY environment variable.
+    Configuration via environment variables:
+        FIELDNOTES_HMAC_KEY: Required. HMAC key for request signing.
+        FIELDNOTES_FORMAT: Optional. "json" (default) or "protobuf".
     """
 
-    DEFAULT_ENDPOINT = "https://fieldnotes.lokryn.com/ingest"
+    BASE_URL = "https://fieldnotes.lokryn.com"
 
     def __init__(
         self,
-        endpoint: str | None = None,
         hmac_key: str | None = None,
+        format: Literal["json", "protobuf"] | None = None,
         timeout: float = 10.0,
     ):
         """Initialize Field Notes sink.
 
         Args:
-            endpoint: Optional custom endpoint. Defaults to Field Notes ingest URL.
             hmac_key: HMAC key. If not provided, reads from FIELDNOTES_HMAC_KEY env var.
+            format: "json" or "protobuf". If not provided, reads from FIELDNOTES_FORMAT
+                env var, defaulting to "json".
             timeout: Request timeout in seconds.
 
         Raises:
             ValueError: If no HMAC key is provided or found in environment.
+            ValueError: If format is not "json" or "protobuf".
         """
         key = hmac_key or os.environ.get("FIELDNOTES_HMAC_KEY")
         if not key:
@@ -101,8 +118,18 @@ class FieldNotesSink(HTTPSink):
                 "HMAC key required. Pass hmac_key or set FIELDNOTES_HMAC_KEY env var."
             )
 
+        fmt = format or os.environ.get("FIELDNOTES_FORMAT", "json")
+        if fmt not in ("json", "protobuf"):
+            raise ValueError(f"Invalid format '{fmt}'. Must be 'json' or 'protobuf'.")
+
+        if fmt == "protobuf":
+            endpoint = f"{self.BASE_URL}/v1/log/protobuf"
+        else:
+            endpoint = f"{self.BASE_URL}/v1/log"
+
         super().__init__(
-            endpoint=endpoint or self.DEFAULT_ENDPOINT,
+            endpoint=endpoint,
             timeout=timeout,
             hmac_key=key,
+            format=fmt,
         )

@@ -69,9 +69,22 @@ sink = FileSink("/var/log/mcp-audit.jsonl")
 ```python
 from lokryn_mcp_log import HTTPSink
 
+# JSON format (default)
 sink = HTTPSink(
     endpoint="https://your-log-collector.com/ingest",
     headers={"Authorization": "Bearer <token>"},
+)
+
+# Protobuf format
+sink = HTTPSink(
+    endpoint="https://your-log-collector.com/ingest/proto",
+    format="protobuf",
+)
+
+# With HMAC signing
+sink = HTTPSink(
+    endpoint="https://your-log-collector.com/ingest",
+    hmac_key="your-secret-key",
 )
 ```
 
@@ -136,12 +149,16 @@ This is a library, not a service. If the sink fails, the exception propagates to
 Send logs directly to [Field Notes](https://lokryn.com/field-notes) for tamper-evident storage and querying:
 
 ```python
-from lokryn_mcp_log import HTTPSink
+from lokryn_mcp_log import FieldNotesSink
 
-sink = HTTPSink(
-    endpoint="https://fieldnotes.lokryn.com/ingest",
-    headers={"Authorization": "Bearer <your-api-key>"},
-)
+# Configure via environment variables:
+# FIELDNOTES_HMAC_KEY=your-secret-key
+# FIELDNOTES_FORMAT=json  (or "protobuf")
+
+sink = FieldNotesSink()
+
+# Or pass explicitly
+sink = FieldNotesSink(hmac_key="your-secret-key", format="protobuf")
 ```
 
 ## License
