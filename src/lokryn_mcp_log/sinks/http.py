@@ -58,7 +58,7 @@ class HTTPSink:
             hashlib.sha256,
         ).hexdigest()
 
-    async def emit(self, record: log_pb2.LogEntry) -> None:
+    async def emit(self, record: log_pb2.LogRequest) -> None:
         """Emit log record via HTTP POST.
 
         Raises:

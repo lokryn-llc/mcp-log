@@ -11,9 +11,9 @@ from lokryn_mcp_log import StdoutSink, FileSink
 from lokryn_mcp_log.schema import log_pb2
 
 
-def create_test_record() -> log_pb2.LogEntry:
+def create_test_record() -> log_pb2.LogRequest:
     """Create a test log record."""
-    return log_pb2.LogEntry(
+    return log_pb2.LogRequest(
         event_type=log_pb2.EVENT_TOOL_INVOCATION,
         outcome=log_pb2.OUTCOME_SUCCESS,
         severity=log_pb2.SEVERITY_INFO,
@@ -22,9 +22,8 @@ def create_test_record() -> log_pb2.LogEntry:
         environment="test",
         resource="tools/test",
         message="Test message",
-        payload=b'{"key": "value"}',
         policy_tags=["SOC2"],
-        sensitivity=log_pb2.SENSITIVITY_INTERNAL,
+        sensitivity=log_pb2.SENSITIVITY_PUBLIC_INTERNAL,
     )
 
 

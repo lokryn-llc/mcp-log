@@ -15,7 +15,20 @@ from mcp.types import (
 )
 from pydantic import AnyUrl
 
-from lokryn_mcp_log.schema import log_pb2
+from lokryn_mcp_log.schema import (
+    log_pb2,
+    EVENT_MCP_INITIALIZE,
+    EVENT_LOGOUT,
+    EVENT_TOOL_LIST,
+    EVENT_TOOL_INVOCATION,
+    EVENT_RESOURCE_LIST,
+    EVENT_RESOURCE_READ,
+    EVENT_PROMPT_LIST,
+    EVENT_PROMPT_EXECUTION,
+    OUTCOME_SUCCESS,
+    OUTCOME_FAILURE_ERROR,
+    SENSITIVITY_CONFIDENTIAL,
+)
 from lokryn_mcp_log.builder import build_log_record
 from lokryn_mcp_log.config import LogConfig
 from lokryn_mcp_log.sinks.base import Sink
@@ -58,6 +71,8 @@ class LoggingProxy:
         self._session = session
         self._sink = sink
         self._config = config
+        self._server_id: str | None = None
+        self._server_version: str | None = None
 
     def __getattr__(self, name: str) -> Any:
         """Forward unknown attributes to underlying session."""
@@ -69,9 +84,11 @@ class LoggingProxy:
         outcome: int,
         resource: str,
         message: str,
-        payload: dict[str, Any] | None = None,
+        tool_name: str | None = None,
+        tool_arguments: dict[str, Any] | None = None,
+        resource_uri: str | None = None,
         duration_ms: float | None = None,
-        correlation_id: str | None = None,
+        trace_id: str | None = None,
     ) -> None:
         """Build and emit a log record."""
         record = build_log_record(
@@ -80,9 +97,13 @@ class LoggingProxy:
             outcome=outcome,
             resource=resource,
             message=message,
-            payload=payload,
-            duration_ms=duration_ms,
-            correlation_id=correlation_id,
+            tool_name=tool_name,
+            tool_arguments=tool_arguments,
+            resource_uri=resource_uri,
+            duration_ms=int(duration_ms) if duration_ms is not None else None,
+            trace_id=trace_id,
+            server_id=self._server_id,
+            server_version=self._server_version,
         )
         await self._sink.emit(record)
 
@@ -92,7 +113,7 @@ class LoggingProxy:
 
     async def initialize(self, **kwargs: Any) -> Any:
         """Initialize the session with logging."""
-        correlation_id = uuid4().hex
+        trace_id = uuid4().hex
         start = time.perf_counter()
 
         try:
@@ -100,51 +121,45 @@ class LoggingProxy:
             duration_ms = (time.perf_counter() - start) * 1000
 
             # Extract server info if available
-            server_info = {}
             if hasattr(result, "serverInfo") and result.serverInfo:
-                server_info = {
-                    "server_name": getattr(result.serverInfo, "name", None),
-                    "server_version": getattr(result.serverInfo, "version", None),
-                }
+                self._server_id = getattr(result.serverInfo, "name", None)
+                self._server_version = getattr(result.serverInfo, "version", None)
 
             await self._emit(
-                event_type=log_pb2.EVENT_LOGIN,
-                outcome=log_pb2.OUTCOME_SUCCESS,
+                event_type=EVENT_MCP_INITIALIZE,
+                outcome=OUTCOME_SUCCESS,
                 resource="session/initialize",
                 message="MCP session initialized",
-                payload=server_info,
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             return result
 
         except Exception as e:
             duration_ms = (time.perf_counter() - start) * 1000
             await self._emit(
-                event_type=log_pb2.EVENT_LOGIN,
-                outcome=log_pb2.OUTCOME_FAILURE_ERROR,
+                event_type=EVENT_MCP_INITIALIZE,
+                outcome=OUTCOME_FAILURE_ERROR,
                 resource="session/initialize",
                 message=f"Failed to initialize session: {e}",
-                payload={"error": str(e), "error_type": type(e).__name__},
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             raise
 
     async def close(self) -> None:
         """Close the session with logging."""
-        correlation_id = uuid4().hex
+        trace_id = uuid4().hex
 
         try:
             # Log before close since we may not be able to emit after
             await self._emit(
-                event_type=log_pb2.EVENT_LOGOUT,
-                outcome=log_pb2.OUTCOME_SUCCESS,
+                event_type=EVENT_LOGOUT,
+                outcome=OUTCOME_SUCCESS,
                 resource="session/close",
                 message="MCP session closed",
-                payload={},
                 duration_ms=0,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
 
             if hasattr(self._session, "close"):
@@ -156,7 +171,7 @@ class LoggingProxy:
 
     async def list_tools(self, **kwargs: Any) -> ListToolsResult:
         """List available tools with logging."""
-        correlation_id = uuid4().hex
+        trace_id = uuid4().hex
         start = time.perf_counter()
 
         try:
@@ -164,26 +179,24 @@ class LoggingProxy:
             duration_ms = (time.perf_counter() - start) * 1000
 
             await self._emit(
-                event_type=log_pb2.EVENT_TOOL_INVOCATION,
-                outcome=log_pb2.OUTCOME_SUCCESS,
+                event_type=EVENT_TOOL_LIST,
+                outcome=OUTCOME_SUCCESS,
                 resource="tools/list",
                 message=f"Listed {len(result.tools)} tools",
-                payload={"tool_count": len(result.tools)},
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             return result
 
         except Exception as e:
             duration_ms = (time.perf_counter() - start) * 1000
             await self._emit(
-                event_type=log_pb2.EVENT_TOOL_INVOCATION,
-                outcome=log_pb2.OUTCOME_FAILURE_ERROR,
+                event_type=EVENT_TOOL_LIST,
+                outcome=OUTCOME_FAILURE_ERROR,
                 resource="tools/list",
                 message=f"Failed to list tools: {e}",
-                payload={"error": str(e), "error_type": type(e).__name__},
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             raise
 
@@ -194,7 +207,7 @@ class LoggingProxy:
         **kwargs: Any,
     ) -> CallToolResult:
         """Call a tool with logging."""
-        correlation_id = uuid4().hex
+        trace_id = uuid4().hex
         start = time.perf_counter()
 
         try:
@@ -203,48 +216,41 @@ class LoggingProxy:
 
             # Determine outcome - check for tool-level error
             if result.isError:
-                outcome = log_pb2.OUTCOME_FAILURE_ERROR
+                outcome = OUTCOME_FAILURE_ERROR
                 message = f"Tool '{name}' returned error"
             else:
-                outcome = log_pb2.OUTCOME_SUCCESS
+                outcome = OUTCOME_SUCCESS
                 message = f"Tool '{name}' executed successfully"
 
             await self._emit(
-                event_type=log_pb2.EVENT_TOOL_INVOCATION,
+                event_type=EVENT_TOOL_INVOCATION,
                 outcome=outcome,
                 resource=f"tools/{name}",
                 message=message,
-                payload={
-                    "tool_name": name,
-                    "arguments": arguments,
-                    "is_error": result.isError,
-                },
+                tool_name=name,
+                tool_arguments=arguments,
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             return result
 
         except Exception as e:
             duration_ms = (time.perf_counter() - start) * 1000
             await self._emit(
-                event_type=log_pb2.EVENT_TOOL_INVOCATION,
-                outcome=log_pb2.OUTCOME_FAILURE_ERROR,
+                event_type=EVENT_TOOL_INVOCATION,
+                outcome=OUTCOME_FAILURE_ERROR,
                 resource=f"tools/{name}",
                 message=f"Tool '{name}' failed: {e}",
-                payload={
-                    "tool_name": name,
-                    "arguments": arguments,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
+                tool_name=name,
+                tool_arguments=arguments,
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             raise
 
     async def list_resources(self, **kwargs: Any) -> ListResourcesResult:
         """List available resources with logging."""
-        correlation_id = uuid4().hex
+        trace_id = uuid4().hex
         start = time.perf_counter()
 
         try:
@@ -252,32 +258,30 @@ class LoggingProxy:
             duration_ms = (time.perf_counter() - start) * 1000
 
             await self._emit(
-                event_type=log_pb2.EVENT_RESOURCE_ACCESS,
-                outcome=log_pb2.OUTCOME_SUCCESS,
+                event_type=EVENT_RESOURCE_LIST,
+                outcome=OUTCOME_SUCCESS,
                 resource="resources/list",
                 message=f"Listed {len(result.resources)} resources",
-                payload={"resource_count": len(result.resources)},
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             return result
 
         except Exception as e:
             duration_ms = (time.perf_counter() - start) * 1000
             await self._emit(
-                event_type=log_pb2.EVENT_RESOURCE_ACCESS,
-                outcome=log_pb2.OUTCOME_FAILURE_ERROR,
+                event_type=EVENT_RESOURCE_LIST,
+                outcome=OUTCOME_FAILURE_ERROR,
                 resource="resources/list",
                 message=f"Failed to list resources: {e}",
-                payload={"error": str(e), "error_type": type(e).__name__},
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             raise
 
     async def read_resource(self, uri: AnyUrl, **kwargs: Any) -> ReadResourceResult:
         """Read a resource with logging."""
-        correlation_id = uuid4().hex
+        trace_id = uuid4().hex
         start = time.perf_counter()
         uri_str = str(uri)
 
@@ -286,32 +290,32 @@ class LoggingProxy:
             duration_ms = (time.perf_counter() - start) * 1000
 
             await self._emit(
-                event_type=log_pb2.EVENT_CONTEXT_ACCESS,
-                outcome=log_pb2.OUTCOME_SUCCESS,
+                event_type=EVENT_RESOURCE_READ,
+                outcome=OUTCOME_SUCCESS,
                 resource=uri_str,
                 message=f"Read resource: {uri_str}",
-                payload={"uri": uri_str, "content_count": len(result.contents)},
+                resource_uri=uri_str,
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             return result
 
         except Exception as e:
             duration_ms = (time.perf_counter() - start) * 1000
             await self._emit(
-                event_type=log_pb2.EVENT_CONTEXT_ACCESS,
-                outcome=log_pb2.OUTCOME_FAILURE_ERROR,
+                event_type=EVENT_RESOURCE_READ,
+                outcome=OUTCOME_FAILURE_ERROR,
                 resource=uri_str,
                 message=f"Failed to read resource: {e}",
-                payload={"uri": uri_str, "error": str(e), "error_type": type(e).__name__},
+                resource_uri=uri_str,
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             raise
 
     async def list_prompts(self, **kwargs: Any) -> ListPromptsResult:
         """List available prompts with logging."""
-        correlation_id = uuid4().hex
+        trace_id = uuid4().hex
         start = time.perf_counter()
 
         try:
@@ -319,26 +323,24 @@ class LoggingProxy:
             duration_ms = (time.perf_counter() - start) * 1000
 
             await self._emit(
-                event_type=log_pb2.EVENT_PROMPT_EXECUTION,
-                outcome=log_pb2.OUTCOME_SUCCESS,
+                event_type=EVENT_PROMPT_LIST,
+                outcome=OUTCOME_SUCCESS,
                 resource="prompts/list",
                 message=f"Listed {len(result.prompts)} prompts",
-                payload={"prompt_count": len(result.prompts)},
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             return result
 
         except Exception as e:
             duration_ms = (time.perf_counter() - start) * 1000
             await self._emit(
-                event_type=log_pb2.EVENT_PROMPT_EXECUTION,
-                outcome=log_pb2.OUTCOME_FAILURE_ERROR,
+                event_type=EVENT_PROMPT_LIST,
+                outcome=OUTCOME_FAILURE_ERROR,
                 resource="prompts/list",
                 message=f"Failed to list prompts: {e}",
-                payload={"error": str(e), "error_type": type(e).__name__},
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             raise
 
@@ -349,7 +351,7 @@ class LoggingProxy:
         **kwargs: Any,
     ) -> GetPromptResult:
         """Get a prompt with logging."""
-        correlation_id = uuid4().hex
+        trace_id = uuid4().hex
         start = time.perf_counter()
 
         try:
@@ -357,35 +359,24 @@ class LoggingProxy:
             duration_ms = (time.perf_counter() - start) * 1000
 
             await self._emit(
-                event_type=log_pb2.EVENT_PROMPT_EXECUTION,
-                outcome=log_pb2.OUTCOME_SUCCESS,
+                event_type=EVENT_PROMPT_EXECUTION,
+                outcome=OUTCOME_SUCCESS,
                 resource=f"prompts/{name}",
                 message=f"Got prompt: {name}",
-                payload={
-                    "prompt_name": name,
-                    "arguments": arguments,
-                    "message_count": len(result.messages),
-                },
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             return result
 
         except Exception as e:
             duration_ms = (time.perf_counter() - start) * 1000
             await self._emit(
-                event_type=log_pb2.EVENT_PROMPT_EXECUTION,
-                outcome=log_pb2.OUTCOME_FAILURE_ERROR,
+                event_type=EVENT_PROMPT_EXECUTION,
+                outcome=OUTCOME_FAILURE_ERROR,
                 resource=f"prompts/{name}",
                 message=f"Failed to get prompt '{name}': {e}",
-                payload={
-                    "prompt_name": name,
-                    "arguments": arguments,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                },
                 duration_ms=duration_ms,
-                correlation_id=correlation_id,
+                trace_id=trace_id,
             )
             raise
 
@@ -398,7 +389,10 @@ def with_logging(
     actor_id: str | None = None,
     component: str = "mcp-client",
     policy_tags: list[str] | None = None,
-    default_sensitivity: int = log_pb2.SENSITIVITY_INTERNAL,
+    default_sensitivity: int = SENSITIVITY_CONFIDENTIAL,
+    session_id: str | None = None,
+    client_id: str = "",
+    client_version: str = "",
 ) -> LoggingProxy:
     """Wrap a ClientSession with logging.
 
@@ -412,6 +406,9 @@ def with_logging(
         component: Component name. Defaults to "mcp-client".
         policy_tags: Optional compliance tags.
         default_sensitivity: Default sensitivity level.
+        session_id: Optional MCP session ID. Generated if not provided.
+        client_id: Optional client identifier.
+        client_version: Optional client version.
 
     Returns:
         LoggingProxy wrapping the session.
@@ -430,5 +427,8 @@ def with_logging(
         component=component,
         policy_tags=policy_tags or [],
         default_sensitivity=default_sensitivity,
+        session_id=session_id or f"mcp_{uuid4().hex[:16]}",
+        client_id=client_id,
+        client_version=client_version,
     )
     return LoggingProxy(session=session, sink=sink, config=config)

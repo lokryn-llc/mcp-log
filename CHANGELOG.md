@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2025-12-25
+
+### Changed
+
+- **Breaking: Schema Migration** - Updated to lokryn-compliance-log v0.2.0
+  - `LogEntry` → `LogRequest` - All sinks now emit `LogRequest` messages
+  - `payload` bytes field replaced with structured `MCPPayload` (tool name, arguments, resource URI are now proper fields)
+  - Added `session_id`, `client_id`, `client_version`, `server_id`, `server_version` fields
+  - Added `trace_id` and `span_id` for distributed tracing support
+- **MCP-Specific Event Types** - Now uses dedicated event types from the schema:
+  - `EVENT_MCP_INITIALIZE` for session initialization
+  - `EVENT_TOOL_LIST`, `EVENT_TOOL_INVOCATION` for tool operations
+  - `EVENT_RESOURCE_LIST`, `EVENT_RESOURCE_READ` for resource operations
+  - `EVENT_PROMPT_LIST`, `EVENT_PROMPT_EXECUTION` for prompt operations
+  - `EVENT_LOGOUT` for session close
+
+### Removed
+
+- Base64-encoded payload field - MCP data is now in the structured `mcp` field
+
 ## [0.3.0] - 2025-12-25
 
 ### Added

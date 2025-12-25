@@ -11,9 +11,9 @@ class MockSink:
     """Mock sink that collects log records for testing."""
 
     def __init__(self):
-        self.records: list[log_pb2.LogEntry] = []
+        self.records: list[log_pb2.LogRequest] = []
 
-    async def emit(self, record: log_pb2.LogEntry) -> None:
+    async def emit(self, record: log_pb2.LogRequest) -> None:
         self.records.append(record)
 
 
@@ -40,10 +40,13 @@ def mock_session():
     # get_prompt
     session.get_prompt.return_value = MagicMock(messages=[])
 
-    # initialize
-    session.initialize.return_value = MagicMock(
-        serverInfo=MagicMock(name="test-server", version="1.0.0")
-    )
+    # MagicMock uses 'name' internally, so we configure it separately
+    server_info = MagicMock()
+    server_info.name = "test-server"
+    server_info.version = "1.0.0"
+    init_result = MagicMock()
+    init_result.serverInfo = server_info
+    session.initialize.return_value = init_result
 
     return session
 

@@ -24,7 +24,7 @@ class FileSink:
         """
         self._path = Path(path)
 
-    async def emit(self, record: log_pb2.LogEntry) -> None:
+    async def emit(self, record: log_pb2.LogRequest) -> None:
         """Emit log record to file."""
         data = MessageToDict(record, preserving_proto_field_name=True)
         line = json.dumps(data, default=str)

@@ -130,47 +130,24 @@ logged = with_logging(
 
 | Operation | Event Type | Resource |
 |-----------|------------|----------|
-| `initialize()` | `EVENT_LOGIN` | `session/initialize` |
-| `list_tools()` | `EVENT_TOOL_INVOCATION` | `tools/list` |
+| `initialize()` | `EVENT_MCP_INITIALIZE` | `session/initialize` |
+| `list_tools()` | `EVENT_TOOL_LIST` | `tools/list` |
 | `call_tool(name, args)` | `EVENT_TOOL_INVOCATION` | `tools/{name}` |
-| `list_resources()` | `EVENT_RESOURCE_ACCESS` | `resources/list` |
-| `read_resource(uri)` | `EVENT_CONTEXT_ACCESS` | `{uri}` |
-| `list_prompts()` | `EVENT_PROMPT_EXECUTION` | `prompts/list` |
+| `list_resources()` | `EVENT_RESOURCE_LIST` | `resources/list` |
+| `read_resource(uri)` | `EVENT_RESOURCE_READ` | `{uri}` |
+| `list_prompts()` | `EVENT_PROMPT_LIST` | `prompts/list` |
 | `get_prompt(name)` | `EVENT_PROMPT_EXECUTION` | `prompts/{name}` |
 | (session close) | `EVENT_LOGOUT` | `session/close` |
 
 Each log includes:
 - Timestamp
 - Actor ID (session/agent identifier)
+- Session ID
 - Duration (milliseconds)
-- Correlation ID (for tracing)
-- Input arguments
+- Trace ID (for distributed tracing)
+- MCP payload (tool name, arguments, resource URI)
 - Outcome (success/failure)
 - Error details (on failure)
-
-## JSON Output Format
-
-When using JSON format, the `payload` field is base64-encoded per the protobuf JSON mapping specification. This field contains structured data like tool arguments, correlation IDs, and durations.
-
-To decode the payload:
-
-```python
-import base64
-import json
-
-log_record = {"payload": "eyJ0b29sX25hbWUiOiAiYWRkIiwgImFyZ3VtZW50cyI6IHsiYSI6IDEsICJiIjogMn19"}
-
-payload = json.loads(base64.b64decode(log_record["payload"]))
-# {"tool_name": "add", "arguments": {"a": 1, "b": 2}}
-```
-
-Or from the command line:
-
-```bash
-echo "eyJ0b29sX25hbWUiOiAiYWRkIn0=" | base64 -d
-```
-
-When using protobuf format, the payload is embedded as raw bytes and no decoding is needed.
 
 ## Error Handling
 

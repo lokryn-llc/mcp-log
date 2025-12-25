@@ -11,9 +11,9 @@ class MockSink:
     """Mock sink that collects log records for testing."""
 
     def __init__(self):
-        self.records: list[log_pb2.LogEntry] = []
+        self.records: list[log_pb2.LogRequest] = []
 
-    async def emit(self, record: log_pb2.LogEntry) -> None:
+    async def emit(self, record: log_pb2.LogRequest) -> None:
         self.records.append(record)
 
 
@@ -27,9 +27,13 @@ def mock_session():
     session.read_resource.return_value = MagicMock(contents=[])
     session.list_prompts.return_value = MagicMock(prompts=[])
     session.get_prompt.return_value = MagicMock(messages=[])
-    session.initialize.return_value = MagicMock(
-        serverInfo=MagicMock(name="test-server", version="1.0.0")
-    )
+    # MagicMock uses 'name' internally, so we configure it separately
+    server_info = MagicMock()
+    server_info.name = "test-server"
+    server_info.version = "1.0.0"
+    init_result = MagicMock()
+    init_result.serverInfo = server_info
+    session.initialize.return_value = init_result
     return session
 
 
@@ -51,7 +55,7 @@ async def test_list_tools_logs_success(mock_session, sink, config):
 
     assert len(sink.records) == 1
     record = sink.records[0]
-    assert record.event_type == log_pb2.EVENT_TOOL_INVOCATION
+    assert record.event_type == log_pb2.EVENT_TOOL_LIST
     assert record.outcome == log_pb2.OUTCOME_SUCCESS
     assert record.resource == "tools/list"
     assert record.actor_id == "test-actor"
@@ -67,8 +71,8 @@ async def test_call_tool_logs_with_arguments(mock_session, sink, config):
     assert len(sink.records) == 1
     record = sink.records[0]
     assert record.resource == "tools/add"
-    assert b'"tool_name": "add"' in record.payload
-    assert b'"a": 1' in record.payload
+    assert record.mcp.tool_name == "add"
+    assert record.mcp.tool_arguments["a"] == 1
 
 
 async def test_call_tool_logs_error_on_exception(mock_session, sink, config):
@@ -82,7 +86,7 @@ async def test_call_tool_logs_error_on_exception(mock_session, sink, config):
     assert len(sink.records) == 1
     record = sink.records[0]
     assert record.outcome == log_pb2.OUTCOME_FAILURE_ERROR
-    assert b"Connection lost" in record.payload
+    assert "Connection lost" in record.message
 
 
 async def test_call_tool_logs_tool_error(mock_session, sink, config):
@@ -95,7 +99,7 @@ async def test_call_tool_logs_tool_error(mock_session, sink, config):
     assert len(sink.records) == 1
     record = sink.records[0]
     assert record.outcome == log_pb2.OUTCOME_FAILURE_ERROR
-    assert b'"is_error": true' in record.payload
+    assert "error" in record.message.lower()
 
 
 async def test_forwards_unknown_attributes(mock_session, sink, config):
@@ -117,7 +121,7 @@ async def test_initialize_logs_success(mock_session, sink, config):
 
     assert len(sink.records) == 1
     record = sink.records[0]
-    assert record.event_type == log_pb2.EVENT_LOGIN
+    assert record.event_type == log_pb2.EVENT_MCP_INITIALIZE
     assert record.outcome == log_pb2.OUTCOME_SUCCESS
     assert record.resource == "session/initialize"
 
@@ -130,19 +134,19 @@ async def test_list_resources_logs_success(mock_session, sink, config):
 
     assert len(sink.records) == 1
     record = sink.records[0]
-    assert record.event_type == log_pb2.EVENT_RESOURCE_ACCESS
+    assert record.event_type == log_pb2.EVENT_RESOURCE_LIST
     assert record.outcome == log_pb2.OUTCOME_SUCCESS
 
 
 async def test_list_prompts_logs_success(mock_session, sink, config):
-    """Test that list_prompts logs a prompt execution event."""
+    """Test that list_prompts logs a prompt list event."""
     proxy = LoggingProxy(mock_session, sink, config)
 
     await proxy.list_prompts()
 
     assert len(sink.records) == 1
     record = sink.records[0]
-    assert record.event_type == log_pb2.EVENT_PROMPT_EXECUTION
+    assert record.event_type == log_pb2.EVENT_PROMPT_LIST
     assert record.outcome == log_pb2.OUTCOME_SUCCESS
 
 
@@ -155,7 +159,7 @@ async def test_get_prompt_logs_with_name(mock_session, sink, config):
     assert len(sink.records) == 1
     record = sink.records[0]
     assert record.resource == "prompts/my-prompt"
-    assert b'"prompt_name": "my-prompt"' in record.payload
+    assert record.event_type == log_pb2.EVENT_PROMPT_EXECUTION
 
 
 async def test_policy_tags_included(mock_session, sink):
@@ -176,22 +180,22 @@ async def test_policy_tags_included(mock_session, sink):
 
 
 async def test_duration_ms_included(mock_session, sink, config):
-    """Test that duration_ms is included in payload."""
+    """Test that duration_ms is included in record."""
     proxy = LoggingProxy(mock_session, sink, config)
 
     await proxy.list_tools()
 
     assert len(sink.records) == 1
     record = sink.records[0]
-    assert b"duration_ms" in record.payload
+    assert record.duration_ms >= 0
 
 
-async def test_correlation_id_included(mock_session, sink, config):
-    """Test that correlation_id is included in payload."""
+async def test_trace_id_included(mock_session, sink, config):
+    """Test that trace_id is included in record."""
     proxy = LoggingProxy(mock_session, sink, config)
 
     await proxy.list_tools()
 
     assert len(sink.records) == 1
     record = sink.records[0]
-    assert b"correlation_id" in record.payload
+    assert len(record.trace_id) > 0
