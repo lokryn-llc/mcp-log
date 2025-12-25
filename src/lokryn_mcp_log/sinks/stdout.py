@@ -25,7 +25,7 @@ class StdoutSink:
         self._stream = stream
         self._indent = 2 if pretty else None
 
-    async def emit(self, record: log_pb2.LogRequest) -> None:
+    async def emit(self, record: log_pb2.LogEntry) -> None:
         """Emit log record to stdout."""
         data = MessageToDict(record, preserving_proto_field_name=True)
         line = json.dumps(data, indent=self._indent, default=str)

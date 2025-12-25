@@ -11,9 +11,9 @@ from lokryn_mcp_log import StdoutSink, FileSink
 from lokryn_mcp_log.schema import log_pb2
 
 
-def create_test_record() -> log_pb2.LogRequest:
+def create_test_record() -> log_pb2.LogEntry:
     """Create a test log record."""
-    return log_pb2.LogRequest(
+    return log_pb2.LogEntry(
         event_type=log_pb2.EVENT_TOOL_INVOCATION,
         outcome=log_pb2.OUTCOME_SUCCESS,
         severity=log_pb2.SEVERITY_INFO,

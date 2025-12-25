@@ -333,14 +333,26 @@ wheels = [
 ]
 
 [[package]]
+name = "lokryn-compliance-log"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/06/fb/eff2b5f26a2e218ea409541faf842b846acbe5cdb3dcd84d193fc60a87e6/lokryn_compliance_log-0.1.1.tar.gz", hash = "sha256:79c2bb94bfb411b89b65b825720214611583e8ec0cddcfca0a5633715657493e", size = 10509, upload-time = "2025-12-25T02:11:07.606Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/46/77/ef54f3ed5c5b8dfea7eceac2cb9db75f0406484f7a9affbf3dee5afdffdd/lokryn_compliance_log-0.1.1-py3-none-any.whl", hash = "sha256:56b939594d64be606b4f319d5b62c8ba907bba0d4bb3d6e92a418620947406f4", size = 11528, upload-time = "2025-12-25T02:11:06.52Z" },
+]
+
+[[package]]
 name = "lokryn-mcp-log"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
     { name = "httpx" },
+    { name = "lokryn-compliance-log" },
     { name = "mcp" },
-    { name = "protobuf" },
 ]
 
 [package.optional-dependencies]
@@ -354,8 +366,8 @@ dev = [
 requires-dist = [
     { name = "aiofiles", specifier = ">=23.0.0" },
     { name = "httpx", specifier = ">=0.25.0" },
+    { name = "lokryn-compliance-log", specifier = ">=0.1.0" },
     { name = "mcp", specifier = ">=1.0.0" },
-    { name = "protobuf", specifier = ">=4.0.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.21.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.1.0" },

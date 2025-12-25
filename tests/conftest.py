@@ -11,9 +11,9 @@ class MockSink:
     """Mock sink that collects log records for testing."""
 
     def __init__(self):
-        self.records: list[log_pb2.LogRequest] = []
+        self.records: list[log_pb2.LogEntry] = []
 
-    async def emit(self, record: log_pb2.LogRequest) -> None:
+    async def emit(self, record: log_pb2.LogEntry) -> None:
         self.records.append(record)
 
 

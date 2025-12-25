@@ -1,4 +1,4 @@
-"""Build LogRequest records from MCP operations."""
+"""Build LogEntry records from MCP operations."""
 
 import json
 from typing import Any
@@ -18,8 +18,8 @@ def build_log_record(
     sensitivity: int | None = None,
     correlation_id: str | None = None,
     duration_ms: float | None = None,
-) -> log_pb2.LogRequest:
-    """Build a LogRequest from operation data.
+) -> log_pb2.LogEntry:
+    """Build a LogEntry from operation data.
 
     Args:
         config: Logging configuration.
@@ -34,7 +34,7 @@ def build_log_record(
         duration_ms: Optional operation duration in milliseconds.
 
     Returns:
-        Populated LogRequest ready for emission.
+        Populated LogEntry ready for emission.
     """
     # Derive severity from outcome if not provided
     if severity is None:
@@ -56,7 +56,7 @@ def build_log_record(
 
     payload_bytes = json.dumps(payload_dict, default=str).encode("utf-8")
 
-    return log_pb2.LogRequest(
+    return log_pb2.LogEntry(
         event_type=event_type,
         outcome=outcome,
         severity=severity,

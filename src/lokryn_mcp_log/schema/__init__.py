@@ -1,28 +1,16 @@
-"""Protobuf schema for compliance logs."""
+"""Protobuf schema for compliance logs.
 
-from lokryn_mcp_log.schema.log_pb2 import (
-    LogRequest,
-    AppendResponse,
-    StreamAck,
-    Severity,
-    Outcome,
+Re-exports from lokryn-compliance-log package.
+"""
+
+from lokryn_compliance_log.v1 import logentry_pb2 as log_pb2
+from lokryn_compliance_log import (
+    LogEntry,
     EventType,
+    Outcome,
+    Severity,
     Sensitivity,
-    SEVERITY_UNSPECIFIED,
-    SEVERITY_DEBUG,
-    SEVERITY_INFO,
-    SEVERITY_NOTICE,
-    SEVERITY_WARNING,
-    SEVERITY_ERROR,
-    SEVERITY_CRITICAL,
-    SEVERITY_ALERT,
-    SEVERITY_EMERGENCY,
-    OUTCOME_UNSPECIFIED,
-    OUTCOME_SUCCESS,
-    OUTCOME_FAILURE_UNAUTHORIZED,
-    OUTCOME_FAILURE_DENIED,
-    OUTCOME_FAILURE_ERROR,
-    OUTCOME_PARTIAL,
+    # EventType values
     EVENT_TYPE_UNSPECIFIED,
     EVENT_LOGIN,
     EVENT_LOGOUT,
@@ -43,6 +31,24 @@ from lokryn_mcp_log.schema.log_pb2 import (
     EVENT_CONTEXT_ACCESS,
     EVENT_PROMPT_EXECUTION,
     EVENT_GUARDRAIL_CHECK,
+    # Outcome values
+    OUTCOME_UNSPECIFIED,
+    OUTCOME_SUCCESS,
+    OUTCOME_FAILURE_UNAUTHORIZED,
+    OUTCOME_FAILURE_DENIED,
+    OUTCOME_FAILURE_ERROR,
+    OUTCOME_PARTIAL,
+    # Severity values
+    SEVERITY_UNSPECIFIED,
+    SEVERITY_DEBUG,
+    SEVERITY_INFO,
+    SEVERITY_NOTICE,
+    SEVERITY_WARNING,
+    SEVERITY_ERROR,
+    SEVERITY_CRITICAL,
+    SEVERITY_ALERT,
+    SEVERITY_EMERGENCY,
+    # Sensitivity values
     SENSITIVITY_UNSPECIFIED,
     SENSITIVITY_PUBLIC,
     SENSITIVITY_INTERNAL,
@@ -52,12 +58,11 @@ from lokryn_mcp_log.schema.log_pb2 import (
 )
 
 __all__ = [
-    "LogRequest",
-    "AppendResponse",
-    "StreamAck",
-    "Severity",
-    "Outcome",
+    "log_pb2",
+    "LogEntry",
     "EventType",
+    "Outcome",
+    "Severity",
     "Sensitivity",
     "SEVERITY_UNSPECIFIED",
     "SEVERITY_DEBUG",

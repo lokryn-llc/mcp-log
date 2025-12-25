@@ -33,7 +33,7 @@ class HTTPSink:
         self._headers.setdefault("Content-Type", "application/json")
         self._timeout = timeout
 
-    async def emit(self, record: log_pb2.LogRequest) -> None:
+    async def emit(self, record: log_pb2.LogEntry) -> None:
         """Emit log record via HTTP POST.
 
         Raises:

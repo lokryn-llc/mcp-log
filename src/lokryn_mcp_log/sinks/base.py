@@ -9,14 +9,14 @@ from lokryn_mcp_log.schema import log_pb2
 class Sink(Protocol):
     """Protocol for log sinks.
 
-    Sinks receive LogRequest messages and emit them somewhere.
+    Sinks receive LogEntry messages and emit them somewhere.
     Implementations must be async.
 
     If emit() raises an exception, it propagates to the caller.
     This is intentional - the library does not swallow errors.
     """
 
-    async def emit(self, record: log_pb2.LogRequest) -> None:
+    async def emit(self, record: log_pb2.LogEntry) -> None:
         """Emit a log record.
 
         Args:
