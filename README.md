@@ -67,6 +67,7 @@ sink = FileSink("/var/log/mcp-audit.jsonl")
 ### HTTPSink
 
 ```python
+import os
 from lokryn_mcp_log import HTTPSink
 
 # JSON format (default)
@@ -85,6 +86,13 @@ sink = HTTPSink(
 sink = HTTPSink(
     endpoint="https://your-log-collector.com/ingest",
     hmac_key="your-secret-key",
+)
+
+# Using environment variables
+sink = HTTPSink(
+    endpoint=os.environ["LOG_ENDPOINT"],
+    hmac_key=os.environ.get("LOG_HMAC_KEY"),
+    format=os.environ.get("LOG_FORMAT", "json"),
 )
 ```
 
@@ -139,6 +147,30 @@ Each log includes:
 - Input arguments
 - Outcome (success/failure)
 - Error details (on failure)
+
+## JSON Output Format
+
+When using JSON format, the `payload` field is base64-encoded per the protobuf JSON mapping specification. This field contains structured data like tool arguments, correlation IDs, and durations.
+
+To decode the payload:
+
+```python
+import base64
+import json
+
+log_record = {"payload": "eyJ0b29sX25hbWUiOiAiYWRkIiwgImFyZ3VtZW50cyI6IHsiYSI6IDEsICJiIjogMn19"}
+
+payload = json.loads(base64.b64decode(log_record["payload"]))
+# {"tool_name": "add", "arguments": {"a": 1, "b": 2}}
+```
+
+Or from the command line:
+
+```bash
+echo "eyJ0b29sX25hbWUiOiAiYWRkIn0=" | base64 -d
+```
+
+When using protobuf format, the payload is embedded as raw bytes and no decoding is needed.
 
 ## Error Handling
 
