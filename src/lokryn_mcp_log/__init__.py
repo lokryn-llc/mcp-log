@@ -2,7 +2,7 @@
 
 from lokryn_mcp_log.proxy import LoggingProxy, with_logging
 from lokryn_mcp_log.config import LogConfig
-from lokryn_mcp_log.sinks import Sink, StdoutSink, FileSink, HTTPSink
+from lokryn_mcp_log.sinks import Sink, StdoutSink, FileSink, HTTPSink, FieldNotesSink
 
 __all__ = [
     "LoggingProxy",
@@ -12,6 +12,7 @@ __all__ = [
     "StdoutSink",
     "FileSink",
     "HTTPSink",
+    "FieldNotesSink",
 ]
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
